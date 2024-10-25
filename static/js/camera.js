@@ -87,21 +87,16 @@ class Camera {
                 console.error('Editor not initialized');
                 return;
             }
-            
-            // Create and load image to verify it's valid
-            const img = new Image();
-            await new Promise((resolve, reject) => {
-                img.onload = resolve;
-                img.onerror = reject;
-                img.src = capturedImage;
-            });
-            
-            // Only hide camera view after image is verified
-            console.log('Image verified, hiding camera view...');
-            this.cameraContainer.classList.add('d-none');
+
+            // Show editor container before loading image
+            this.editorContainer.classList.remove('d-none');
             
             // Now load image in editor
-            window.editor.loadImage(capturedImage);
+            await window.editor.loadImage(capturedImage);
+            
+            // Only hide camera view after editor is fully initialized
+            this.cameraContainer.classList.add('d-none');
+            
             console.log('Editor initialized with captured image successfully');
             
         } catch (error) {

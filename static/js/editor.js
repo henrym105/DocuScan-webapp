@@ -24,49 +24,45 @@ class Editor {
         document.addEventListener('touchend', () => this.handleCornerDragEnd());
     }
 
-    loadImage(imageData) {
+    async loadImage(imageData) {
         if (!imageData) {
             console.error('No image data provided');
             return;
         }
 
-        this.originalImage = imageData;
-        const img = new Image();
-        
-        img.onload = () => {
-            // Calculate the scaling factor to fit the container
-            const containerWidth = this.editorContainer.offsetWidth;
-            const scale = containerWidth / img.width;
+        return new Promise((resolve, reject) => {
+            this.originalImage = imageData;
+            const img = new Image();
             
-            // Set canvas size to match the displayed image size
-            this.editorCanvas.width = containerWidth;
-            this.editorCanvas.height = img.height * scale;
+            img.onload = () => {
+                // Set canvas size to match the displayed image size
+                this.editorCanvas.width = img.width;
+                this.editorCanvas.height = img.height;
+                
+                // Draw the image
+                const ctx = this.editorCanvas.getContext('2d');
+                ctx.clearRect(0, 0, img.width, img.height);
+                ctx.drawImage(img, 0, 0);
+                
+                // Initialize corners after image is loaded
+                this.corners = [
+                    [0, 0],
+                    [img.width - 1, 0],
+                    [img.width - 1, img.height - 1],
+                    [0, img.height - 1]
+                ];
+                
+                this.drawCornerPoints();
+                resolve();
+            };
             
-            // Draw the image
-            const ctx = this.editorCanvas.getContext('2d');
-            ctx.clearRect(0, 0, this.editorCanvas.width, this.editorCanvas.height);
-            ctx.drawImage(img, 0, 0, this.editorCanvas.width, this.editorCanvas.height);
+            img.onerror = (error) => {
+                console.error('Error loading image:', error);
+                reject(error);
+            };
             
-            // Show editor container
-            this.editorContainer.classList.remove('d-none');
-            
-            // Initialize corners using the actual displayed dimensions
-            this.corners = [
-                [0, 0],                                    // Top-left
-                [this.editorCanvas.width - 1, 0],         // Top-right
-                [this.editorCanvas.width - 1, this.editorCanvas.height - 1], // Bottom-right
-                [0, this.editorCanvas.height - 1]         // Bottom-left
-            ];
-            
-            this.drawCornerPoints();
-        };
-        
-        img.onerror = (error) => {
-            console.error('Error loading image:', error);
-            alert('Error loading image. Please try again.');
-        };
-        
-        img.src = imageData;
+            img.src = imageData;
+        });
     }
 
     drawCornerPoints() {
