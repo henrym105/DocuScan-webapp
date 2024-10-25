@@ -66,51 +66,47 @@ class Camera {
     }
 
     async captureImage() {
-        if (!this.stream || !this.stream.active) {
-            console.error('No active video stream available');
-            return;
-        }
-
-        if (!this.videoReady) {
-            console.warn('Waiting for video stream to initialize...');
+        if (!this.stream || !this.stream.active || !this.videoReady) {
             return;
         }
 
         try {
             console.log('Starting image capture process...');
             
-            // Set canvas dimensions to match video
+            // Set canvas dimensions and capture image
             this.previewCanvas.width = this.video.videoWidth;
             this.previewCanvas.height = this.video.videoHeight;
-            
-            // Draw video frame to canvas
             const ctx = this.previewCanvas.getContext('2d');
             ctx.drawImage(this.video, 0, 0);
             
             // Convert to base64
             const capturedImage = this.previewCanvas.toDataURL('image/jpeg', 0.9);
             
-            console.log('Image captured, hiding camera view...');
-            // Hide camera view
+            // Initialize editor first
+            if (!window.editor) {
+                console.error('Editor not initialized');
+                return;
+            }
+            
+            // Create and load image to verify it's valid
+            const img = new Image();
+            await new Promise((resolve, reject) => {
+                img.onload = resolve;
+                img.onerror = reject;
+                img.src = capturedImage;
+            });
+            
+            // Only hide camera view after image is verified
+            console.log('Image verified, hiding camera view...');
             this.cameraContainer.classList.add('d-none');
             
-            // Wait for a brief moment to ensure DOM updates are complete
-            await new Promise(resolve => setTimeout(resolve, 100));
-            
-            console.log('Initializing editor with captured image...');
-            // Initialize editor with captured image
-            if (window.editor) {
-                window.editor.loadImage(capturedImage);
-                console.log('Editor initialized with captured image successfully');
-            } else {
-                throw new Error('Editor not initialized');
-            }
+            // Now load image in editor
+            window.editor.loadImage(capturedImage);
+            console.log('Editor initialized with captured image successfully');
             
         } catch (error) {
             console.error('Error during image capture:', error);
             alert('Failed to capture image. Please try again.');
-            
-            // Reset view state
             this.cameraContainer.classList.remove('d-none');
             this.editorContainer.classList.add('d-none');
         }
