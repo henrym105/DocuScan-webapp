@@ -46,24 +46,34 @@ class Editor {
                     aspectRatio: (img.width / img.height).toFixed(2)
                 });
                 
-                // Set canvas dimensions
-                this.editorCanvas.width = img.width;
-                this.editorCanvas.height = img.height;
+                // Calculate dimensions based on container width
+                const containerWidth = this.editorContainer.clientWidth;
+                const scale = containerWidth / img.width;
+                const displayWidth = containerWidth;
+                const displayHeight = img.height * scale;
                 
-                // Draw the image
+                // Set canvas dimensions to match display size
+                this.editorCanvas.width = displayWidth;
+                this.editorCanvas.height = displayHeight;
+                
+                // Draw the image scaled to fit
                 const ctx = this.editorCanvas.getContext('2d');
-                ctx.clearRect(0, 0, img.width, img.height);
-                ctx.drawImage(img, 0, 0);
+                ctx.clearRect(0, 0, displayWidth, displayHeight);
+                ctx.drawImage(img, 0, 0, displayWidth, displayHeight);
                 
-                // Initialize corner points
+                // Initialize corner points with display dimensions
                 this.corners = [
-                    [0, 0],                    // Top-left
-                    [img.width, 0],            // Top-right
-                    [img.width, img.height],   // Bottom-right
-                    [0, img.height]            // Bottom-left
+                    [0, 0],                           // Top-left
+                    [displayWidth - 1, 0],            // Top-right
+                    [displayWidth - 1, displayHeight - 1], // Bottom-right
+                    [0, displayHeight - 1]            // Bottom-left
                 ];
                 
-                console.log('Corner points initialized:', this.corners);
+                console.log('Corner points initialized:', {
+                    corners: this.corners,
+                    displayWidth,
+                    displayHeight
+                });
                 
                 // Draw corner points and overlay
                 this.drawCornerPoints();
@@ -166,10 +176,13 @@ class Editor {
         if (!this.isDragging || this.selectedCorner === null) return;
 
         const rect = this.editorCanvas.getBoundingClientRect();
-        const x = Math.max(0, Math.min(this.editorCanvas.width, 
-            event.clientX - rect.left));
+        const scaleX = this.editorCanvas.width / rect.width;
+        const scaleY = this.editorCanvas.height / rect.height;
+        
+        const x = Math.max(0, Math.min(this.editorCanvas.width,
+            (event.clientX - rect.left) * scaleX));
         const y = Math.max(0, Math.min(this.editorCanvas.height,
-            event.clientY - rect.top));
+            (event.clientY - rect.top) * scaleY));
 
         this.corners[this.selectedCorner] = [x, y];
         console.log('Corner dragged:', { index: this.selectedCorner, x, y });
