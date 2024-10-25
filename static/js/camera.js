@@ -24,7 +24,6 @@ class Camera {
             this.stream = stream;
             this.video.srcObject = stream;
             
-            // Log successful camera setup
             console.log('Camera setup successful', {
                 tracks: stream.getTracks().length,
                 settings: stream.getTracks()[0].getSettings()
@@ -59,48 +58,26 @@ class Camera {
                 videoHeight: this.video.videoHeight
             });
 
-            // Verify canvas exists
-            if (!this.previewCanvas) {
-                throw new Error('Preview canvas not found');
-            }
-
             // Set canvas dimensions to match video
             this.previewCanvas.width = this.video.videoWidth;
             this.previewCanvas.height = this.video.videoHeight;
-            
-            console.log('Canvas dimensions set', {
-                width: this.previewCanvas.width,
-                height: this.previewCanvas.height
-            });
             
             // Draw video frame to canvas
             const ctx = this.previewCanvas.getContext('2d');
             ctx.clearRect(0, 0, this.previewCanvas.width, this.previewCanvas.height);
             ctx.drawImage(this.video, 0, 0);
             
-            // Verify image was drawn
-            const imageData = ctx.getImageData(0, 0, 1, 1);
-            if (!imageData) {
-                throw new Error('Failed to capture image');
-            }
-            
             // Convert to base64
             const capturedImage = this.previewCanvas.toDataURL('image/jpeg');
             
-            // Verify image data
-            if (!capturedImage || capturedImage === 'data:,') {
-                throw new Error('Invalid image data');
-            }
-            
             console.log('Image captured successfully');
             
-            // Show editor
+            // Hide camera view and pass image to editor
             this.cameraContainer.classList.add('d-none');
-            this.editorContainer.classList.remove('d-none');
             
-            // Initialize editor with captured image and detect corners
+            // Initialize editor with captured image
             if (window.editor) {
-                window.editor.loadImage(capturedImage, true);
+                window.editor.loadImage(capturedImage);
             } else {
                 throw new Error('Editor not initialized');
             }
@@ -115,7 +92,6 @@ class Camera {
         }
     }
 
-    // Cleanup method
     stop() {
         if (this.stream) {
             this.stream.getTracks().forEach(track => track.stop());
