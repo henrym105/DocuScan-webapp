@@ -27,6 +27,7 @@ class Editor {
         this.editorCanvas.addEventListener('mousedown', (e) => this.handleMouseDown(e));
         this.editorCanvas.addEventListener('mousemove', (e) => this.handleMouseMove(e));
         this.editorCanvas.addEventListener('mouseup', () => this.handleMouseUp());
+        this.editorCanvas.addEventListener('mouseleave', () => this.handleMouseUp());
         this.editorCanvas.addEventListener('touchstart', (e) => this.handleTouchStart(e));
         this.editorCanvas.addEventListener('touchmove', (e) => this.handleTouchMove(e));
         this.editorCanvas.addEventListener('touchend', () => this.handleMouseUp());
@@ -57,7 +58,11 @@ class Editor {
     }
 
     async loadImage(imageData, detectCorners = false) {
-        console.log('Loading image...', { detectCorners });
+        console.log('Loading image...', { 
+            detectCorners,
+            imageDataLength: imageData?.length,
+            hasData: !!imageData
+        });
         
         if (!imageData) {
             console.error('No image data provided');
@@ -72,7 +77,8 @@ class Editor {
                 img.onload = () => {
                     console.log('Image loaded successfully:', {
                         width: img.width,
-                        height: img.height
+                        height: img.height,
+                        aspectRatio: (img.width / img.height).toFixed(2)
                     });
                     
                     // Set canvas dimensions
@@ -84,12 +90,13 @@ class Editor {
                     ctx.clearRect(0, 0, img.width, img.height);
                     ctx.drawImage(img, 0, 0);
                     
-                    // Initialize corners after image is drawn
+                    // Initialize corners with proper margin
+                    const margin = Math.min(img.width, img.height) * 0.1;
                     this.corners = [
-                        [0, 0],
-                        [img.width, 0],
-                        [img.width, img.height],
-                        [0, img.height]
+                        [margin, margin], // Top-left
+                        [img.width - margin, margin], // Top-right
+                        [img.width - margin, img.height - margin], // Bottom-right
+                        [margin, img.height - margin] // Bottom-left
                     ];
                     
                     console.log('Initial corners set:', this.corners);
@@ -106,7 +113,12 @@ class Editor {
                         .then(data => {
                             if (data.success && data.corners) {
                                 console.log('Corners detected:', data.corners);
-                                this.corners = data.corners;
+                                // Validate detected corners
+                                if (this.validateCorners(data.corners)) {
+                                    this.corners = data.corners;
+                                } else {
+                                    console.warn('Detected corners invalid, using default corners');
+                                }
                             } else {
                                 console.warn('Using default corners - no corners detected from backend');
                             }
@@ -140,6 +152,24 @@ class Editor {
         img.src = imageData;
     }
 
+    validateCorners(corners) {
+        if (!Array.isArray(corners) || corners.length !== 4) {
+            return false;
+        }
+        
+        // Check each corner is valid and within bounds
+        return corners.every(corner => 
+            Array.isArray(corner) && 
+            corner.length === 2 &&
+            typeof corner[0] === 'number' &&
+            typeof corner[1] === 'number' &&
+            corner[0] >= 0 &&
+            corner[0] <= this.editorCanvas.width &&
+            corner[1] >= 0 &&
+            corner[1] <= this.editorCanvas.height
+        );
+    }
+
     updatePreview() {
         // Verify canvas and image availability
         if (!this.editorCanvas || !this.originalImage) {
@@ -148,7 +178,7 @@ class Editor {
         }
 
         // Verify corners array
-        if (!this.corners || !Array.isArray(this.corners) || this.corners.length !== 4) {
+        if (!this.validateCorners(this.corners)) {
             console.error('Invalid corners array:', this.corners);
             return;
         }
@@ -157,7 +187,8 @@ class Editor {
         console.log('Updating preview...', {
             mode: this.mode,
             canvasWidth: this.editorCanvas.width,
-            canvasHeight: this.editorCanvas.height
+            canvasHeight: this.editorCanvas.height,
+            corners: this.corners
         });
 
         // Clear canvas
@@ -166,11 +197,6 @@ class Editor {
         // Draw original or B&W preview
         const img = new Image();
         img.onload = () => {
-            console.log('Preview image loaded', {
-                imgWidth: img.width,
-                imgHeight: img.height
-            });
-
             try {
                 // Draw the image
                 if (this.mode === 'bw') {
@@ -195,45 +221,50 @@ class Editor {
                     ctx.drawImage(img, 0, 0);
                 }
 
-                // Verify all corners are valid before drawing
-                const validCorners = this.corners.every(corner => 
-                    Array.isArray(corner) && 
-                    corner.length === 2 && 
-                    typeof corner[0] === 'number' && 
-                    typeof corner[1] === 'number'
-                );
-
-                if (!validCorners) {
-                    console.error('Invalid corner coordinates:', this.corners);
-                    return;
-                }
-
-                // Draw corners and lines
+                // Draw semi-transparent document area
                 ctx.beginPath();
                 ctx.moveTo(this.corners[0][0], this.corners[0][1]);
                 for (let i = 1; i <= 4; i++) {
                     ctx.lineTo(this.corners[i % 4][0], this.corners[i % 4][1]);
                 }
+                ctx.closePath();
+                
+                // Fill with semi-transparent blue
+                ctx.fillStyle = 'rgba(0, 123, 255, 0.2)';
+                ctx.fill();
+                
+                // Draw border lines
                 ctx.strokeStyle = 'rgba(0, 123, 255, 0.8)';
-                ctx.lineWidth = 2;
+                ctx.lineWidth = 3;
                 ctx.stroke();
 
-                // Calculate pulse effect
-                const pulseRadius = 15 + Math.sin(this.pulsePhase) * 3;
+                // Draw corner points with enhanced visibility
+                const cornerRadius = this.isDragging ? 25 : 20;
+                const pulseEffect = this.isDragging ? 0 : Math.sin(this.pulsePhase) * 5;
                 
-                // Draw corner points with labels
                 const labels = ['TL', 'TR', 'BR', 'BL'];
                 this.corners.forEach((corner, index) => {
+                    const radius = (this.selectedCorner === index ? cornerRadius + 5 : cornerRadius) + pulseEffect;
+                    
+                    // Draw larger highlight circle
                     ctx.beginPath();
-                    ctx.arc(corner[0], corner[1], pulseRadius, 0, 2 * Math.PI);
-                    ctx.fillStyle = this.selectedCorner === index ? 'rgba(255, 123, 0, 0.8)' : 'rgba(0, 123, 255, 0.8)';
+                    ctx.arc(corner[0], corner[1], radius + 3, 0, 2 * Math.PI);
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.3)';
+                    ctx.fill();
+                    
+                    // Draw corner point
+                    ctx.beginPath();
+                    ctx.arc(corner[0], corner[1], radius, 0, 2 * Math.PI);
+                    ctx.fillStyle = this.selectedCorner === index ? 
+                        'rgba(255, 123, 0, 0.8)' : 
+                        'rgba(0, 123, 255, 0.8)';
                     ctx.fill();
                     ctx.strokeStyle = 'white';
-                    ctx.lineWidth = 2;
+                    ctx.lineWidth = 3;
                     ctx.stroke();
 
-                    // Draw label
-                    ctx.font = '14px Arial';
+                    // Draw label with enhanced visibility
+                    ctx.font = 'bold 16px Arial';
                     ctx.fillStyle = 'white';
                     ctx.textAlign = 'center';
                     ctx.textBaseline = 'middle';
@@ -259,12 +290,16 @@ class Editor {
         const x = (e.clientX - rect.left) * (this.editorCanvas.width / rect.width);
         const y = (e.clientY - rect.top) * (this.editorCanvas.height / rect.height);
         
+        // Use larger hit area for better touch interaction
+        const hitRadius = 25;
+        
         this.corners.forEach((corner, index) => {
             const dx = corner[0] - x;
             const dy = corner[1] - y;
-            if (Math.sqrt(dx * dx + dy * dy) < 20) {
+            if (Math.sqrt(dx * dx + dy * dy) < hitRadius) {
                 this.isDragging = true;
                 this.selectedCorner = index;
+                console.log('Corner selected:', { index, position: corner });
                 this.updatePreview();
             }
         });
@@ -274,16 +309,32 @@ class Editor {
         if (!this.isDragging || !this.corners) return;
         
         const rect = this.editorCanvas.getBoundingClientRect();
-        const x = Math.max(0, Math.min(this.editorCanvas.width, 
-            (e.clientX - rect.left) * (this.editorCanvas.width / rect.width)));
-        const y = Math.max(0, Math.min(this.editorCanvas.height,
-            (e.clientY - rect.top) * (this.editorCanvas.height / rect.height)));
+        const x = (e.clientX - rect.left) * (this.editorCanvas.width / rect.width);
+        const y = (e.clientY - rect.top) * (this.editorCanvas.height / rect.height);
         
-        this.corners[this.selectedCorner] = [x, y];
+        // Apply bounds checking with small margin
+        const margin = 10;
+        const newX = Math.max(margin, Math.min(this.editorCanvas.width - margin, x));
+        const newY = Math.max(margin, Math.min(this.editorCanvas.height - margin, y));
+        
+        // Update corner position
+        this.corners[this.selectedCorner] = [newX, newY];
+        console.log('Corner moved:', {
+            index: this.selectedCorner,
+            position: [newX, newY]
+        });
+        
+        // Update preview immediately
         this.updatePreview();
     }
 
     handleMouseUp() {
+        if (this.isDragging) {
+            console.log('Corner drag ended:', {
+                index: this.selectedCorner,
+                finalPosition: this.corners[this.selectedCorner]
+            });
+        }
         this.isDragging = false;
         this.selectedCorner = null;
         this.updatePreview();
@@ -312,12 +363,13 @@ class Editor {
     toggleMode() {
         this.mode = this.mode === 'color' ? 'bw' : 'color';
         this.modeToggle.textContent = this.mode === 'color' ? 'Toggle B&W' : 'Toggle Color';
+        console.log('Mode toggled:', this.mode);
         this.updatePreview();
     }
 
     async processImage() {
-        if (!this.originalImage || !this.corners) {
-            console.error('Missing image or corners for processing');
+        if (!this.originalImage || !this.validateCorners(this.corners)) {
+            console.error('Missing image or invalid corners for processing');
             return;
         }
 
@@ -327,6 +379,11 @@ class Editor {
         formData.append('mode', this.mode);
 
         try {
+            console.log('Processing image...', {
+                corners: this.corners,
+                mode: this.mode
+            });
+            
             const response = await fetch('/process', {
                 method: 'POST',
                 body: formData
