@@ -323,6 +323,7 @@ dependencies = [
     { name = "email-validator" },
     { name = "flask" },
     { name = "flask-sqlalchemy" },
+    { name = "numpy" },
     { name = "opencv-python-headless" },
     { name = "psycopg2-binary" },
 ]
@@ -332,6 +333,7 @@ requires-dist = [
     { name = "email-validator", specifier = ">=2.2.0" },
     { name = "flask", specifier = ">=3.0.3" },
     { name = "flask-sqlalchemy", specifier = ">=3.1.1" },
+    { name = "numpy" },
     { name = "opencv-python-headless", specifier = ">=4.10.0.84" },
     { name = "psycopg2-binary", specifier = ">=2.9.10" },
 ]
