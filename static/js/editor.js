@@ -34,24 +34,28 @@ class Editor {
         const img = new Image();
         
         img.onload = () => {
-            // Set canvas size to match original image size
-            this.editorCanvas.width = img.width;
-            this.editorCanvas.height = img.height;
+            // Calculate the scaling factor to fit the container
+            const containerWidth = this.editorContainer.offsetWidth;
+            const scale = containerWidth / img.width;
+            
+            // Set canvas size to match the displayed image size
+            this.editorCanvas.width = containerWidth;
+            this.editorCanvas.height = img.height * scale;
             
             // Draw the image
             const ctx = this.editorCanvas.getContext('2d');
-            ctx.clearRect(0, 0, img.width, img.height);
-            ctx.drawImage(img, 0, 0);
+            ctx.clearRect(0, 0, this.editorCanvas.width, this.editorCanvas.height);
+            ctx.drawImage(img, 0, 0, this.editorCanvas.width, this.editorCanvas.height);
             
             // Show editor container
             this.editorContainer.classList.remove('d-none');
             
-            // Initialize corners
+            // Initialize corners using the actual displayed dimensions
             this.corners = [
-                [0, 0],                    // Top-left
-                [img.width - 1, 0],        // Top-right
-                [img.width - 1, img.height - 1], // Bottom-right
-                [0, img.height - 1]        // Bottom-left
+                [0, 0],                                    // Top-left
+                [this.editorCanvas.width - 1, 0],         // Top-right
+                [this.editorCanvas.width - 1, this.editorCanvas.height - 1], // Bottom-right
+                [0, this.editorCanvas.height - 1]         // Bottom-left
             ];
             
             this.drawCornerPoints();
@@ -74,8 +78,8 @@ class Editor {
         cornerContainer.style.position = 'absolute';
         cornerContainer.style.top = this.editorCanvas.offsetTop + 'px';
         cornerContainer.style.left = this.editorCanvas.offsetLeft + 'px';
-        cornerContainer.style.width = this.editorCanvas.width + 'px';
-        cornerContainer.style.height = this.editorCanvas.height + 'px';
+        cornerContainer.style.width = this.editorCanvas.clientWidth + 'px';
+        cornerContainer.style.height = this.editorCanvas.clientHeight + 'px';
         cornerContainer.id = 'corner-container';
         
         // Draw the semi-transparent overlay
@@ -144,10 +148,13 @@ class Editor {
         if (!this.isDragging || this.selectedCorner === null) return;
 
         const rect = this.editorCanvas.getBoundingClientRect();
+        const scaleX = this.editorCanvas.width / rect.width;
+        const scaleY = this.editorCanvas.height / rect.height;
+        
         const x = Math.max(0, Math.min(this.editorCanvas.width,
-            event.clientX - rect.left));
+            (event.clientX - rect.left) * scaleX));
         const y = Math.max(0, Math.min(this.editorCanvas.height,
-            event.clientY - rect.top));
+            (event.clientY - rect.top) * scaleY));
 
         this.corners[this.selectedCorner] = [x, y];
         this.drawCornerPoints();
