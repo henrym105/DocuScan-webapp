@@ -7,6 +7,7 @@ class Camera {
         this.editorContainer = document.getElementById('editor-container');
         
         this.stream = null;
+        this.videoReady = false;
         
         this.setupCamera();
         this.setupEventListeners();
@@ -30,6 +31,12 @@ class Camera {
             
             this.stream = stream;
             this.video.srcObject = stream;
+            
+            // Set up video ready state handlers
+            this.video.onloadeddata = () => {
+                this.videoReady = true;
+                console.log('Video stream is ready');
+            };
             
             // Wait for video to be ready
             await new Promise((resolve) => {
@@ -64,8 +71,8 @@ class Camera {
             return;
         }
 
-        if (this.video.readyState !== 4) {
-            console.warn('Video is not ready yet');
+        if (!this.videoReady) {
+            console.warn('Waiting for video stream to initialize...');
             return;
         }
 
@@ -106,6 +113,7 @@ class Camera {
             this.stream.getTracks().forEach(track => track.stop());
             this.stream = null;
         }
+        this.videoReady = false;
     }
 }
 
