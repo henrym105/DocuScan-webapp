@@ -27,8 +27,32 @@
     position: absolute;
     transform: translate(-50%, -50%);
     cursor: move;
+    z-index: 100;
+}
+
+.corner-label {
+    position: absolute;
+    left: 50%;
+    top: 50%;
+    transform: translate(-50%, -50%);
+    color: white;
+    font-size: 12px;
+    font-weight: bold;
+    pointer-events: none;
 }
 
 #camera-container, #editor-container, #result-container {
     position: relative;
+}
+
+#corner-container {
+    pointer-events: none;
+}
+
+#corner-container .corner-point {
+    pointer-events: all;
+}
+
+#corner-container canvas {
+    pointer-events: none;
 }
