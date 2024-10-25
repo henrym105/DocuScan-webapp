@@ -14,6 +14,12 @@ class Camera {
 
     async setupCamera() {
         try {
+            // First check if getUserMedia is supported
+            if (!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia) {
+                throw new Error('Camera API is not supported in this browser');
+            }
+
+            // Request camera access with preferred settings
             const stream = await navigator.mediaDevices.getUserMedia({
                 video: {
                     facingMode: 'environment',
@@ -21,17 +27,30 @@ class Camera {
                     height: { ideal: 1080 }
                 }
             });
+            
             this.stream = stream;
             this.video.srcObject = stream;
             
-            console.log('Camera setup successful', {
-                tracks: stream.getTracks().length,
-                settings: stream.getTracks()[0].getSettings()
+            // Wait for video to be ready
+            await new Promise((resolve) => {
+                this.video.onloadedmetadata = resolve;
             });
+            
+            this.video.play();
             
         } catch (err) {
             console.error('Error accessing camera:', err);
-            alert('Error accessing camera. Please ensure camera permissions are granted.');
+            let errorMessage = 'Error accessing camera. ';
+            
+            if (err.name === 'NotAllowedError') {
+                errorMessage += 'Please grant camera permissions and reload the page.';
+            } else if (err.name === 'NotFoundError') {
+                errorMessage += 'No camera device found.';
+            } else {
+                errorMessage += 'Please ensure camera permissions are granted and try again.';
+            }
+            
+            alert(errorMessage);
         }
     }
 
@@ -40,37 +59,27 @@ class Camera {
     }
 
     async captureImage() {
-        // Verify video stream is active
         if (!this.stream || !this.stream.active) {
             console.error('No active video stream available');
             return;
         }
 
-        // Verify video is playing
         if (this.video.readyState !== 4) {
             console.warn('Video is not ready yet');
             return;
         }
 
         try {
-            console.log('Capturing image...', {
-                videoWidth: this.video.videoWidth,
-                videoHeight: this.video.videoHeight
-            });
-
             // Set canvas dimensions to match video
             this.previewCanvas.width = this.video.videoWidth;
             this.previewCanvas.height = this.video.videoHeight;
             
             // Draw video frame to canvas
             const ctx = this.previewCanvas.getContext('2d');
-            ctx.clearRect(0, 0, this.previewCanvas.width, this.previewCanvas.height);
             ctx.drawImage(this.video, 0, 0);
             
             // Convert to base64
-            const capturedImage = this.previewCanvas.toDataURL('image/jpeg');
-            
-            console.log('Image captured successfully');
+            const capturedImage = this.previewCanvas.toDataURL('image/jpeg', 0.9);
             
             // Hide camera view and pass image to editor
             this.cameraContainer.classList.add('d-none');
