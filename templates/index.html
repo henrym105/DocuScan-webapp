@@ -1,0 +1,46 @@
+{% extends "base.html" %}
+
+{% block content %}
+<div class="row">
+    <div class="col-md-8 mx-auto">
+        <div class="card">
+            <div class="card-body">
+                <div id="camera-container" class="mb-3">
+                    <video id="video" class="w-100" autoplay playsinline></video>
+                    <canvas id="preview-canvas" class="d-none"></canvas>
+                </div>
+                
+                <div id="editor-container" class="d-none">
+                    <canvas id="editor-canvas" class="w-100 mb-3"></canvas>
+                    <div class="d-flex justify-content-between mb-3">
+                        <button id="retake-btn" class="btn btn-secondary">Retake</button>
+                        <div class="btn-group">
+                            <button id="mode-toggle" class="btn btn-outline-primary">Toggle B&W</button>
+                            <button id="process-btn" class="btn btn-primary">Process</button>
+                        </div>
+                    </div>
+                </div>
+
+                <div id="result-container" class="d-none">
+                    <img id="result-image" class="w-100 mb-3">
+                    <div class="d-flex justify-content-between">
+                        <button id="back-btn" class="btn btn-secondary">Back</button>
+                        <a id="download-btn" class="btn btn-success" download="scanned-document.jpg">Download</a>
+                    </div>
+                </div>
+
+                <div class="text-center mt-3">
+                    <button id="capture-btn" class="btn btn-lg btn-primary rounded-circle">
+                        <i class="bi bi-camera"></i>
+                    </button>
+                </div>
+            </div>
+        </div>
+    </div>
+</div>
+{% endblock %}
+
+{% block scripts %}
+<script src="{{ url_for('static', filename='js/camera.js') }}"></script>
+<script src="{{ url_for('static', filename='js/editor.js') }}"></script>
+{% endblock %}
