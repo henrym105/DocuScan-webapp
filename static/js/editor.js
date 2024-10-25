@@ -10,8 +10,8 @@ class Editor {
         this.backBtn = document.getElementById('back-btn');
         this.downloadBtn = document.getElementById('download-btn');
         
-        // Initialize corners with default values
-        this.corners = [[0, 0], [0, 0], [0, 0], [0, 0]];
+        // Initialize corners with null to indicate not set
+        this.corners = null;
         this.isDragging = false;
         this.selectedCorner = null;
         this.mode = 'color';
@@ -38,6 +38,9 @@ class Editor {
     }
 
     startPulseAnimation() {
+        if (this.animationFrame) {
+            cancelAnimationFrame(this.animationFrame);
+        }
         const animate = () => {
             this.pulsePhase = (this.pulsePhase + 0.05) % (2 * Math.PI);
             this.updatePreview();
@@ -49,89 +52,163 @@ class Editor {
     stopPulseAnimation() {
         if (this.animationFrame) {
             cancelAnimationFrame(this.animationFrame);
+            this.animationFrame = null;
         }
     }
 
     async loadImage(imageData, detectCorners = false) {
+        console.log('Loading image...', { detectCorners });
+        
+        if (!imageData) {
+            console.error('No image data provided');
+            return;
+        }
+
         this.originalImage = imageData;
         const img = new Image();
-        img.onload = () => {
-            this.editorCanvas.width = img.width;
-            this.editorCanvas.height = img.height;
-            
-            // Set default corners based on image dimensions
-            this.corners = [
-                [0, 0],
-                [img.width, 0],
-                [img.width, img.height],
-                [0, img.height]
-            ];
-            
-            if (detectCorners) {
-                // Request corner detection from backend
-                const formData = new FormData();
-                formData.append('image', imageData);
-                
-                fetch('/process', {
-                    method: 'POST',
-                    body: formData
-                })
-                .then(response => response.json())
-                .then(data => {
-                    if (data.success && data.corners) {
-                        this.corners = data.corners;
+        
+        try {
+            await new Promise((resolve, reject) => {
+                img.onload = () => {
+                    console.log('Image loaded successfully:', {
+                        width: img.width,
+                        height: img.height
+                    });
+                    
+                    // Set canvas dimensions
+                    this.editorCanvas.width = img.width;
+                    this.editorCanvas.height = img.height;
+                    
+                    // Draw the image first
+                    const ctx = this.editorCanvas.getContext('2d');
+                    ctx.clearRect(0, 0, img.width, img.height);
+                    ctx.drawImage(img, 0, 0);
+                    
+                    // Initialize corners after image is drawn
+                    this.corners = [
+                        [0, 0],
+                        [img.width, 0],
+                        [img.width, img.height],
+                        [0, img.height]
+                    ];
+                    
+                    console.log('Initial corners set:', this.corners);
+                    
+                    if (detectCorners) {
+                        const formData = new FormData();
+                        formData.append('image', imageData);
+                        
+                        fetch('/process', {
+                            method: 'POST',
+                            body: formData
+                        })
+                        .then(response => response.json())
+                        .then(data => {
+                            if (data.success && data.corners) {
+                                console.log('Corners detected:', data.corners);
+                                this.corners = data.corners;
+                            } else {
+                                console.warn('Using default corners - no corners detected from backend');
+                            }
+                            this.updatePreview();
+                        })
+                        .catch(error => {
+                            console.error('Error detecting corners:', error);
+                            this.updatePreview();
+                        });
+                    } else {
+                        this.updatePreview();
                     }
-                    this.updatePreview();
-                })
-                .catch(error => {
-                    console.error('Error detecting corners:', error);
-                    this.updatePreview();
-                });
-            } else {
-                this.updatePreview();
-            }
+                    
+                    resolve();
+                };
+                
+                img.onerror = (error) => {
+                    console.error('Error loading image:', error);
+                    reject(error);
+                };
+            });
             
-            // Start the pulse animation after loading the image
+            // Start animation only after successful load
             this.startPulseAnimation();
-        };
+            
+        } catch (error) {
+            console.error('Failed to load image:', error);
+            alert('Error loading image. Please try again.');
+        }
+        
         img.src = imageData;
     }
 
     updatePreview() {
-        if (!this.editorCanvas || !this.originalImage) return;
+        // Verify canvas and image availability
+        if (!this.editorCanvas || !this.originalImage) {
+            console.warn('Canvas or original image not available');
+            return;
+        }
+
+        // Verify corners array
+        if (!this.corners || !Array.isArray(this.corners) || this.corners.length !== 4) {
+            console.error('Invalid corners array:', this.corners);
+            return;
+        }
 
         const ctx = this.editorCanvas.getContext('2d');
+        console.log('Updating preview...', {
+            mode: this.mode,
+            canvasWidth: this.editorCanvas.width,
+            canvasHeight: this.editorCanvas.height
+        });
+
+        // Clear canvas
         ctx.clearRect(0, 0, this.editorCanvas.width, this.editorCanvas.height);
         
         // Draw original or B&W preview
         const img = new Image();
         img.onload = () => {
-            // Draw the image
-            if (this.mode === 'bw') {
-                const offscreen = document.createElement('canvas');
-                offscreen.width = img.width;
-                offscreen.height = img.height;
-                const offCtx = offscreen.getContext('2d');
-                
-                offCtx.drawImage(img, 0, 0);
-                
-                const imageData = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
-                const data = imageData.data;
-                for (let i = 0; i < data.length; i += 4) {
-                    const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
-                    const value = avg > 128 ? 255 : 0;
-                    data[i] = data[i + 1] = data[i + 2] = value;
+            console.log('Preview image loaded', {
+                imgWidth: img.width,
+                imgHeight: img.height
+            });
+
+            try {
+                // Draw the image
+                if (this.mode === 'bw') {
+                    const offscreen = document.createElement('canvas');
+                    offscreen.width = img.width;
+                    offscreen.height = img.height;
+                    const offCtx = offscreen.getContext('2d');
+                    
+                    offCtx.drawImage(img, 0, 0);
+                    
+                    const imageData = offCtx.getImageData(0, 0, offscreen.width, offscreen.height);
+                    const data = imageData.data;
+                    for (let i = 0; i < data.length; i += 4) {
+                        const avg = (data[i] + data[i + 1] + data[i + 2]) / 3;
+                        const value = avg > 128 ? 255 : 0;
+                        data[i] = data[i + 1] = data[i + 2] = value;
+                    }
+                    offCtx.putImageData(imageData, 0, 0);
+                    
+                    ctx.drawImage(offscreen, 0, 0);
+                } else {
+                    ctx.drawImage(img, 0, 0);
                 }
-                offCtx.putImageData(imageData, 0, 0);
-                
-                ctx.drawImage(offscreen, 0, 0);
-            } else {
-                ctx.drawImage(img, 0, 0);
-            }
-            
-            // Draw corners and lines if corners are valid
-            if (this.corners && this.corners.length === 4) {
-                // Draw lines connecting corners
+
+                // Verify all corners are valid before drawing
+                const validCorners = this.corners.every(corner => 
+                    Array.isArray(corner) && 
+                    corner.length === 2 && 
+                    typeof corner[0] === 'number' && 
+                    typeof corner[1] === 'number'
+                );
+
+                if (!validCorners) {
+                    console.error('Invalid corner coordinates:', this.corners);
+                    return;
+                }
+
+                // Draw corners and lines
                 ctx.beginPath();
                 ctx.moveTo(this.corners[0][0], this.corners[0][1]);
                 for (let i = 1; i <= 4; i++) {
@@ -140,7 +217,7 @@ class Editor {
                 ctx.strokeStyle = 'rgba(0, 123, 255, 0.8)';
                 ctx.lineWidth = 2;
                 ctx.stroke();
-                
+
                 // Calculate pulse effect
                 const pulseRadius = 15 + Math.sin(this.pulsePhase) * 3;
                 
@@ -162,12 +239,22 @@ class Editor {
                     ctx.textBaseline = 'middle';
                     ctx.fillText(labels[index], corner[0], corner[1]);
                 });
+
+            } catch (error) {
+                console.error('Error during preview update:', error);
             }
         };
+        
+        img.onerror = (error) => {
+            console.error('Error loading preview image:', error);
+        };
+        
         img.src = this.originalImage;
     }
 
     handleMouseDown(e) {
+        if (!this.corners) return;
+        
         const rect = this.editorCanvas.getBoundingClientRect();
         const x = (e.clientX - rect.left) * (this.editorCanvas.width / rect.width);
         const y = (e.clientY - rect.top) * (this.editorCanvas.height / rect.height);
@@ -184,7 +271,7 @@ class Editor {
     }
 
     handleMouseMove(e) {
-        if (!this.isDragging) return;
+        if (!this.isDragging || !this.corners) return;
         
         const rect = this.editorCanvas.getBoundingClientRect();
         const x = Math.max(0, Math.min(this.editorCanvas.width, 
@@ -229,6 +316,11 @@ class Editor {
     }
 
     async processImage() {
+        if (!this.originalImage || !this.corners) {
+            console.error('Missing image or corners for processing');
+            return;
+        }
+
         const formData = new FormData();
         formData.append('image', this.originalImage);
         formData.append('corners', JSON.stringify(this.corners));
@@ -244,6 +336,7 @@ class Editor {
             if (data.success) {
                 this.showResult(data.processed_image);
             } else {
+                console.error('Processing error:', data.error);
                 alert('Error processing image: ' + data.error);
             }
         } catch (error) {
@@ -262,6 +355,8 @@ class Editor {
 
     retake() {
         this.stopPulseAnimation();
+        this.corners = null;
+        this.originalImage = null;
         this.editorContainer.classList.add('d-none');
         document.getElementById('camera-container').classList.remove('d-none');
     }
