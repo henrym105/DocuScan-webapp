@@ -77,6 +77,8 @@ class Camera {
         }
 
         try {
+            console.log('Starting image capture process...');
+            
             // Set canvas dimensions to match video
             this.previewCanvas.width = this.video.videoWidth;
             this.previewCanvas.height = this.video.videoHeight;
@@ -88,12 +90,18 @@ class Camera {
             // Convert to base64
             const capturedImage = this.previewCanvas.toDataURL('image/jpeg', 0.9);
             
-            // Hide camera view and pass image to editor
+            console.log('Image captured, hiding camera view...');
+            // Hide camera view
             this.cameraContainer.classList.add('d-none');
             
+            // Wait for a brief moment to ensure DOM updates are complete
+            await new Promise(resolve => setTimeout(resolve, 100));
+            
+            console.log('Initializing editor with captured image...');
             // Initialize editor with captured image
             if (window.editor) {
                 window.editor.loadImage(capturedImage);
+                console.log('Editor initialized with captured image successfully');
             } else {
                 throw new Error('Editor not initialized');
             }
