@@ -30,7 +30,7 @@ class Camera {
         this.captureBtn.addEventListener('click', () => this.captureImage());
     }
 
-    captureImage() {
+    async captureImage() {
         // Set canvas dimensions to match video
         this.previewCanvas.width = this.video.videoWidth;
         this.previewCanvas.height = this.video.videoHeight;
@@ -46,8 +46,8 @@ class Camera {
         this.cameraContainer.classList.add('d-none');
         this.editorContainer.classList.remove('d-none');
         
-        // Initialize editor with captured image
-        window.editor.loadImage(imageData);
+        // Initialize editor with captured image and detect corners
+        window.editor.loadImage(imageData, true);
     }
 }
 
